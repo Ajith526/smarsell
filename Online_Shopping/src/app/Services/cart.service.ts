@@ -1,16 +1,14 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Observable, Observer } from 'rxjs';
+import { catchError, map, Observable, Observer, throwError } from 'rxjs';
 import { CartItem } from '../Model/cart';
 import { Product } from '../Model/product';
-
-
 
 @Injectable({
   providedIn: 'root'
 })
 export class CartService {
-  private apiUrl = 'http://localhost:8081/api/cart/add'; // Update with your backend API URL
+  
 
   cartItems: CartItem[] = [];
 
@@ -29,11 +27,12 @@ export class CartService {
         image: product.image,
         quantity: 1
       };
-      this.cartItems.push(newItem);
+      
       this.saveCart(newItem); // Call saveCart with the new item
     }
   }
-  saveCart(product: Product): void {
+  
+  saveCart(cartItem: CartItem): void {
     const observer: Observer<any> = {
       next: response => {
         console.log('Item added to cart successfully');
@@ -46,40 +45,40 @@ export class CartService {
       }
     };
   
-    this.http.post('/api/cart/add', product).subscribe(observer);
+    this.http.post('http://localhost:8081/api/cart',cartItem).subscribe(observer);
   }
-  // saveCart(product: Product) {
-  //   console.log(product);
-  //   return this.http.post(`${this.apiUrl}`, product).subscribe(
-  //     response => {
-  //       console.log('Item saved to database:', response);
-  //     },
-  //     error => {
-  //       console.error('Error saving item to database:', error);
-  //     }
-  //   );
-  // }
+  
 
-  removeFromCart(productId: number) {
+
+  getCartItems(): Observable<CartItem[]> {
+    return this.http.get<CartItem[]>('http://localhost:8081/api/cart/items');
+  }
+
+  getTotalPrice(): Observable<number> {
+    return this.getCartItems().pipe(
+      map(cartItems => {
+        return cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
+      })
+    );
+  }
+  
+
+  removeFromCart(productId: number): Observable<any> {
     const index = this.cartItems.findIndex(item => item.id === productId);
     if (index !== -1) {
       this.cartItems.splice(index, 1); // Remove item from the cart
     }
+    // Send a DELETE request to the API endpoint to remove the item from the cart in the database
+    return this.http.delete(`http://localhost:8081/api/cart/remove/${productId}`).pipe(
+      catchError((error) => {
+        console.error('Failed to remove item from cart', error);
+        return throwError('Failed to remove item from cart');
+      })
+    );
   }
-
-  getCartItems(): CartItem[] {
-    return this.cartItems;
-  }
-
-  getTotalPrice(): number {
-    return this.cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
-  }
-
-  clearCart() {
-    this.cartItems = [];
-  }
-
+  
 }
+
 
 
 // @Injectable({
